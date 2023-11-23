@@ -1,4 +1,4 @@
-module github.com/candy-digital/twirp-swagger-gen
+module github.com/DmitryKolbin/twirp-swagger-gen
 
 go 1.16
 

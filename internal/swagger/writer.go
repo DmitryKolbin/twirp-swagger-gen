@@ -52,10 +52,22 @@ func (sw *Writer) Package(pkg *proto.Package) {
 	sw.Produces = []string{"application/json"}
 	sw.Host = sw.hostname
 	sw.Consumes = sw.Produces
+	title := comment(pkg.Comment)
+	if title == "" {
+		title = path.Base(sw.filename)
+	}
+	var version string
+	if sw.Info != nil {
+		version = sw.Info.Version
+	}
+	if version == "" {
+		version = "version not set"
+	}
 	sw.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
-			Title:   path.Base(sw.filename),
-			Version: "version not set",
+			Title:       title,
+			Description: description(pkg.Comment),
+			Version:     version,
 		},
 	}
 	sw.Swagger.Definitions = make(spec.Definitions)
@@ -143,6 +155,21 @@ func description(comment *proto.Comment) string {
 	return strings.Join(result, "\n")
 }
 
+func (sw *Writer) Service(service *proto.Service) {
+	name := comment(service.Comment)
+	if name == "" {
+		name = service.Name
+	}
+	sw.Swagger.Tags = append(sw.Swagger.Tags, spec.Tag{
+		VendorExtensible: spec.VendorExtensible{},
+		TagProps: spec.TagProps{
+			Description:  description(service.Comment),
+			Name:         comment(service.Comment),
+			ExternalDocs: nil,
+		},
+	})
+}
+
 func (sw *Writer) RPC(rpc *proto.RPC) {
 	parent, ok := rpc.Parent.(*proto.Service)
 	if !ok {
@@ -152,13 +179,19 @@ func (sw *Writer) RPC(rpc *proto.RPC) {
 	pathName := filepath.Join("/"+sw.pathPrefix+"/", sw.packageName+"."+parent.Name, rpc.Name)
 	// pathName := fmt.Sprintf("/twirp/%s.%s/%s", sw.packageName, parent.Name, rpc.Name)
 
+	tag := comment(parent.Comment)
+	if tag == "" {
+		tag = parent.Name
+	}
+
 	sw.Swagger.Paths.Paths[pathName] = spec.PathItem{
 		PathItemProps: spec.PathItemProps{
 			Post: &spec.Operation{
 				OperationProps: spec.OperationProps{
-					ID:      rpc.Name,
-					Tags:    []string{parent.Name},
-					Summary: comment(rpc.Comment),
+					ID:          rpc.Name,
+					Tags:        []string{tag},
+					Summary:     comment(rpc.Comment),
+					Description: description(rpc.Comment),
 					Responses: &spec.Responses{
 						ResponsesProps: spec.ResponsesProps{
 							StatusCodeResponses: map[int]spec.Response{
@@ -391,6 +424,7 @@ func (sw *Writer) Handlers() []proto.Handler {
 	return []proto.Handler{
 		proto.WithEnum(sw.Enum),
 		proto.WithPackage(sw.Package),
+		proto.WithService(sw.Service),
 		proto.WithRPC(sw.RPC),
 		proto.WithMessage(sw.Message),
 		proto.WithImport(sw.Import),

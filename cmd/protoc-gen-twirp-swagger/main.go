@@ -4,8 +4,8 @@ import (
 	"errors"
 	"flag"
 
+	"github.com/DmitryKolbin/twirp-swagger-gen/internal/swagger"
 	"github.com/apex/log"
-	"github.com/candy-digital/twirp-swagger-gen/internal/swagger"
 	"github.com/davecgh/go-spew/spew"
 	"google.golang.org/protobuf/compiler/protogen"
 )
@@ -21,7 +21,9 @@ func main() {
 	hostname := flags.String("hostname", "example.com", "")
 	pathPrefix := flags.String("path_prefix", "/twirp", "")
 	outputSuffix := flags.String("output_suffix", ".swagger.json", "")
-	authMode := flags.String("auth_mode", "", "only bearer (via swagger 2 API key) is supported")
+	authMode := flags.String("auth_mode", "", "bearer|custom-header\tsupport bearer (via swagger 2 API key) and api key in custom header")
+	customHeader := flags.String("custom_header", "", "custom header for 'custom-header' auth_mode")
+	version := flags.String("version", "", "your api version")
 
 	opts := protogen.Options{
 		ParamFunc: flags.Set,
@@ -42,9 +44,18 @@ func main() {
 				switch *authMode {
 				case "bearer":
 					swaggerOpts = append(swaggerOpts, swagger.WithBearerAuthentication())
+				case "custom-header":
+					if customHeader == nil || *customHeader == "" {
+						log.Warnf("missing custom header for: %q", *authMode)
+					} else {
+						swaggerOpts = append(swaggerOpts, swagger.WithApiKeyAuthentication(*customHeader))
+					}
 				default:
 					log.Warnf("unsupported auth mode: %q", *authMode)
 				}
+			}
+			if version != nil && *version != "" {
+				swaggerOpts = append(swaggerOpts, swagger.WithVersion(*version))
 			}
 			writer := swagger.NewWriter(in, *hostname, *pathPrefix, swaggerOpts...)
 
